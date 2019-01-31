@@ -12,6 +12,9 @@ import bpy
 import bmesh
 import math
 
+def is_uv_on_border(uv):
+    return abs(.5 - uv%1) >= 0.499999
+
 class OpCutToUvRects(bpy.types.Operator):
     bl_idname = "uvs.cut_to_uv_rects"
     bl_label = "Cut into pieces using UV"
@@ -59,7 +62,7 @@ class OpCutToUvRects(bpy.types.Operator):
                                     border_face = face
                                     border_axis = axis
                                     if uv < min_max[0]:
-                                        border_value = min_max[0]
+                                        borde3r_value = min_max[0]
                                     else:
                                         border_value = min_max[1]
                                     break
@@ -67,8 +70,7 @@ class OpCutToUvRects(bpy.types.Operator):
                             if border_face:
                                 break
                             
-                            #IF RIGHT ON THE BORDER
-                            if abs(.5 - uv%1)*2 <= 0.0000001:
+                            if is_uv_on_border(uv):
                                 min_maxes.append((round(uv-1), round(uv+1)))
                             else:
                                 min_maxes.append((math.floor(uv), math.ceil(uv)))
@@ -78,11 +80,14 @@ class OpCutToUvRects(bpy.types.Operator):
                 
                 #>>>NEED TO CHECK IF THIS WORKS FIRST
                 if border_face:
-                    bmesh.ops.delete(bm, border_face, 'FACES')
+                    bmesh.ops.delete(bm, geom=[border_face], context='FACES')
+                    continue
                 #CHECK END<<<
 
                 if not border_face:
                     bm.to_mesh(obj.data)
+                    region:bpy.types.Region = context.region
+                    region.tag_redraw() 
                     return {'FINISHED'}
 
                 #>>>------------------
@@ -95,7 +100,7 @@ class OpCutToUvRects(bpy.types.Operator):
                 #         relevant_loops.append(loop)
 
                 #         #IF RIGHT ON THE BORDER
-                #         if abs(.5 - uv%1)*2 <= 0.0000001:
+                #         if is_uv_on_border(uv):
                             
 
                 #     uvs = (
