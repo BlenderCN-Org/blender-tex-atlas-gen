@@ -26,23 +26,9 @@ class OpCutToUvRects(bpy.types.Operator):
     def execute(self, context:bpy.types.Context):
         objects:bpy.types.Object = context.selected_objects
 
-        # bpy.context.tool_settings.use_uv_select_sync = False
-        # bpy.ops.mesh.select_all(action='DESELECT')
-        # bpy.ops.uv.select_all(action='DESELECT')
-
-        #first of all, let's make sure all the faces are concave:
-        # bmesh.ops.connect_verts_concave(bm, bm.faces[:])
-
         for obj in objects:
             bm:bmesh.types.BMesh = bmesh.new()
             bm.from_mesh(obj.data)
-
-            #TO CONNECT VERTS:
-            # bmesh.ops.connect_verts
-            # bmesh.ops.split_edges
-            # bmesh.ops.subdivide_edges
-            # bmesh.ops.weld_verts
-            # bmesh.ops.uv
 
             uv_lay = bm.loops.layers.uv.active
 
@@ -81,12 +67,6 @@ class OpCutToUvRects(bpy.types.Operator):
 
                         if border_face:
                             break
-                
-                #>>>NEED TO CHECK IF THIS WORKS FIRST
-                # if border_face:
-                #     bmesh.ops.delete(bm, geom=[border_face], context='FACES')
-                #     continue
-                #CHECK END<<<
 
                 if not border_face:
                     bm.to_mesh(obj.data)
@@ -94,8 +74,6 @@ class OpCutToUvRects(bpy.types.Operator):
                     region.tag_redraw() 
                     return {'FINISHED'}
 
-                #>>>------------------
-                # relevant_edges:dict = {}
                 verts_to_connect = []
                 edges = {}
                 for edge in border_face.edges: #type: bmesh.types.BMEdge
@@ -131,52 +109,10 @@ class OpCutToUvRects(bpy.types.Operator):
                     edges[edge] = [vert, subdivision_value]
 
                 for edge, values in edges.items():
-                    print(edge)
-                    print(values[0])
-                    print(values[1])
                     edge_vert_pair = bmesh.utils.edge_split(edge, values[0], values[1])
                     verts_to_connect.append(edge_vert_pair[1])
                 
-                print("HEY! {} :: {}".format(i, len(bm.faces[:])))
                 bmesh.ops.connect_verts(bm, verts=verts_to_connect)
-                bm.faces.ensure_lookup_table()
-                bm.edges.ensure_lookup_table()
-                bm.verts.ensure_lookup_table()
-                
-
-                # verts_to_connect = []
-                # subd_result = bmesh.ops.subdivide_edges(
-                #         bm,
-                #         edges = list(relevant_edges.keys()),
-                #         use_single_edge = True,
-                #         cuts = 1)
-                #         # edge_percents = relevant_edges)
-                # verts_to_connect.append(subd_result['geom_inner'][0])
-                
-                # bmesh.ops.connect_verts(bm, verts=verts_to_connect)
-
-                # ------------------<<<
-
-                # j = 0
-                # sqr = 
-                # #loop is basically a corner of a face
-                # for loop in face.loops:
-                #     uv = loop[uv_lay].uv
-                #     print("Loop UV: %f, %f" % uv[:])
-                #     vert = loop.vert
-                #     print("Loop Vert: (%f,%f,%f)" % vert.co[:])
-
-                #     y = 0
-                #     if j==2 or j==3:
-                #         y = 1
-
-                #     x = 0
-                #     if j==1 or j==2:
-                #         x = 1
-
-                #     loop[uv_lay].uv = (i*2+x, i*2+y)
-                #     j += 1
-                # # i += 1
 
 classes = [
     OpCutToUvRects,
