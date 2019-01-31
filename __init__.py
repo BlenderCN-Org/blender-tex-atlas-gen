@@ -48,6 +48,10 @@ class OpCutToUvRects(bpy.types.Operator):
 
             i = 0
             while True:
+                i += 1
+                if (i > 5000):
+                    return {'CANCELLED'}
+
                 #FIRST FIND A FACE WITH UVS SPLATTERED OVER MORE THAN ONE UV SQUARE
                 border_axis = -1
                 border_value = -9999999
@@ -62,7 +66,7 @@ class OpCutToUvRects(bpy.types.Operator):
                                     border_face = face
                                     border_axis = axis
                                     if uv < min_max[0]:
-                                        borde3r_value = min_max[0]
+                                        border_value = min_max[0]
                                     else:
                                         border_value = min_max[1]
                                     break
@@ -79,9 +83,9 @@ class OpCutToUvRects(bpy.types.Operator):
                             break
                 
                 #>>>NEED TO CHECK IF THIS WORKS FIRST
-                if border_face:
-                    bmesh.ops.delete(bm, geom=[border_face], context='FACES')
-                    continue
+                # if border_face:
+                #     bmesh.ops.delete(bm, geom=[border_face], context='FACES')
+                #     continue
                 #CHECK END<<<
 
                 if not border_face:
@@ -91,29 +95,67 @@ class OpCutToUvRects(bpy.types.Operator):
                     return {'FINISHED'}
 
                 #>>>------------------
-                # relevant_edges = []
-                # for edge in border_face.edges: #type: bmesh.types.BMEdge
-                #     relevant_loops = []
-                #     for loop in edge.link_loops: #type: bmesh.types.BMLoop
-                #         if loop.face != border_face:
-                #             continue
-                #         relevant_loops.append(loop)
+                # relevant_edges:dict = {}
+                verts_to_connect = []
+                edges = {}
+                for edge in border_face.edges: #type: bmesh.types.BMEdge
+                    relevant_loops = []
+                    for vert in edge.verts: #type: bmesh.types.BMVert
+                        for loop in vert.link_loops: #type: bmesh.types.BMLoop
+                            if loop.face != border_face:
+                                continue
+                            relevant_loops.append(loop)
 
-                #         #IF RIGHT ON THE BORDER
-                #         if is_uv_on_border(uv):
-                            
+                    uvs = (
+                        relevant_loops[0][uv_lay].uv[border_axis],
+                        relevant_loops[1][uv_lay].uv[border_axis])
+                    
+                    subdivision_value:int
+                    if uvs[0] == border_value:
+                        subdivision_value = 1
+                        if edge.verts[0] not in verts_to_connect:
+                            verts_to_connect.append(edge.verts[0])
+                        continue
+                    elif uvs[1] == border_value:
+                        subdivision_value = 0
+                        if edge.verts[1] not in verts_to_connect:
+                            verts_to_connect.append(edge.verts[1])
+                        continue
+                    elif uvs[0] < border_value and uvs[1] > border_value:
+                        subdivision_value = abs((border_value-uvs[1])/(uvs[0]-uvs[1]))
+                    elif uvs[1] < border_value and uvs[0] > border_value:
+                        subdivision_value = abs((border_value-uvs[1])/(uvs[0]-uvs[1]))
+                    else:
+                        continue
+                    
+                    edges[edge] = [vert, subdivision_value]
 
-                #     uvs = (
-                #         relevant_loops[0][uv_lay].uv[axis],
-                #         relevant_loops[1][uv_lay].uv[axis])
-                        
-                #     for
+                for edge, values in edges.items():
+                    print(edge)
+                    print(values[0])
+                    print(values[1])
+                    edge_vert_pair = bmesh.utils.edge_split(edge, values[0], values[1])
+                    verts_to_connect.append(edge_vert_pair[1])
+                
+                print("HEY! {} :: {}".format(i, len(bm.faces[:])))
+                bmesh.ops.connect_verts(bm, verts=verts_to_connect)
+                bm.faces.ensure_lookup_table()
+                bm.edges.ensure_lookup_table()
+                bm.verts.ensure_lookup_table()
+                
 
-                #     uv_b = 
+                # verts_to_connect = []
+                # subd_result = bmesh.ops.subdivide_edges(
+                #         bm,
+                #         edges = list(relevant_edges.keys()),
+                #         use_single_edge = True,
+                #         cuts = 1)
+                #         # edge_percents = relevant_edges)
+                # verts_to_connect.append(subd_result['geom_inner'][0])
+                
+                # bmesh.ops.connect_verts(bm, verts=verts_to_connect)
 
-                #         #IF ON EDGE OF SQUARE
-                #         if 
-                #------------------<<<
+                # ------------------<<<
 
                 # j = 0
                 # sqr = 
@@ -134,7 +176,7 @@ class OpCutToUvRects(bpy.types.Operator):
 
                 #     loop[uv_lay].uv = (i*2+x, i*2+y)
                 #     j += 1
-                # i += 1
+                # # i += 1
 
 classes = [
     OpCutToUvRects,
