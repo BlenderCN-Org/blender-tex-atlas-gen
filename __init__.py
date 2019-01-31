@@ -18,7 +18,8 @@ def is_uv_on_border(uv):
 class OpCutToUvRects(bpy.types.Operator):
     bl_idname = "uvs.cut_to_uv_rects"
     bl_label = "Cut into pieces using UV"
-    bl_description = "Cut into pieces accoring to uv squares: 0 to 1, 1 to 2, etc."
+    bl_description = "Cut into pieces accoring to uv squares: 0 to 1, 1 to 2, etc.\n\
+        ALL UV ISLANDS HAVE TO BE CONVEX!"
     bl_options = {'REGISTER', 'UNDO'}
 
     steps : bpy.props.IntProperty(name="Edges", default=3, min=3, soft_max=100)
@@ -32,12 +33,7 @@ class OpCutToUvRects(bpy.types.Operator):
 
             uv_lay = bm.loops.layers.uv.active
 
-            i = 0
             while True:
-                i += 1
-                if (i > 5000):
-                    return {'CANCELLED'}
-
                 #FIRST FIND A FACE WITH UVS SPLATTERED OVER MORE THAN ONE UV SQUARE
                 border_axis = -1
                 border_value = -9999999
@@ -72,7 +68,7 @@ class OpCutToUvRects(bpy.types.Operator):
                     bm.to_mesh(obj.data)
                     region:bpy.types.Region = context.region
                     region.tag_redraw() 
-                    return {'FINISHED'}
+                    break
 
                 verts_to_connect = []
                 edges = {}
@@ -113,9 +109,59 @@ class OpCutToUvRects(bpy.types.Operator):
                     verts_to_connect.append(edge_vert_pair[1])
                 
                 bmesh.ops.connect_verts(bm, verts=verts_to_connect)
+                
+        return {'FINISHED'}
+
+class OpAssembleUvRects(bpy.types.Operator):
+    bl_idname = "uvs.assemble_uv_rects"
+    bl_label = "Assemble UV rects content into (0;1)"
+    bl_description = "Move all of the UV rects that are outside of (0; 1) into (0; 1) for future usage in an atlas."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        objects:bpy.types.Object = context.selected_objects
+
+        for obj in objects:
+            bm:bmesh.types.BMesh = bmesh.new()
+            bm.from_mesh(obj.data)
+            
+            uv_lay = bm.loops.layers.uv.active
+            
+            for axis in range(0, 2):
+                for face in bm.faces: #type: bmesh.types.BMFace
+                    #first figure out the current rect:
+                    rect_min = -9999999
+                    rect_max = 9999999
+                    for loop in face.loops: #type: bmesh.types.BMLoop
+                        uv = loop[uv_lay].uv[axis]
+                        if is_uv_on_border(uv):
+                            loop_min = round(uv-1)
+                            loop_max = round(uv+1)
+                        else:
+                            loop_min = math.floor(uv)
+                            loop_max = math.ceil(uv)
+
+                        rect_min = max(rect_min, loop_min)
+                        rect_max = min(rect_max, loop_max)
+                
+                    #then calculate the movement amount
+                    movement = -rect_min
+                    if (rect_max - rect_min > 1.000001):
+                        print("Weird Face with no area at least in one axis!")
+                    
+                    #now move it to the (0;1) rect
+                    for loop in face.loops:
+                        loop[uv_lay].uv[axis] += movement
+
+            bm.to_mesh(obj.data)
+
+        region:bpy.types.Region = context.region
+        region.tag_redraw() 
+        return {'FINISHED'}
 
 classes = [
     OpCutToUvRects,
+    OpAssembleUvRects,
 ]
 
 def register():
